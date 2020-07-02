@@ -20,7 +20,7 @@ EthernetServer server(80);
 // size of buffer used to capture HTTP requests
 #define REQ_BUF_SZ 80
 char HTTP_req[REQ_BUF_SZ] = {0}; // buffered HTTP request stored as null terminated string
-uint8_t req_index = 0;              // index into HTTP_req buffer
+uint8_t req_index = 0;           // index into HTTP_req buffer
 
 // sets every element of str to 0 (clears array)
 void StrClear(char *str, char length)
@@ -71,7 +71,10 @@ COROUTINE(netowrkTask)
     COROUTINE_BEGIN();
 
     // start the Ethernet connection and the server:
-    Ethernet.begin(mac, ip);
+    Ethernet.begin(mac);
+    MDNS.begin("RobotHub", 2);
+    MDNS.setServiceName("robothub");
+    MDNS.addService("_http._tcp", 80);
 
     // Check for Ethernet hardware present
     if (Ethernet.hardwareStatus() == EthernetNoHardware)
