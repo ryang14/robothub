@@ -1,10 +1,14 @@
 #include <Arduino.h>
-#include <AceRoutine.h>
+#include <TeensyThreads.h>
+#include "tasks.h"
 #include <NativeEthernet.h>
 #include <PacketSerial.h>
 #include <ArduinoJson.h>
 #include "ports.h"
 #include "index.h"
+#include "scriptTask.h"
+
+extern char program[];
 
 // Enter a MAC address and IP address for your controller below.
 // The IP address will be dependent on your local network:
@@ -66,12 +70,10 @@ char StrContains(char *str, const char *sfind)
     return 0;
 }
 
-COROUTINE(netowrkTask)
+void networkTask()
 {
-    COROUTINE_BEGIN();
-
     // start the Ethernet connection and the server:
-    Ethernet.begin(mac);
+    Ethernet.begin(mac, ip);
     MDNS.begin("RobotHub", 2);
     MDNS.setServiceName("robothub");
     MDNS.addService("_http._tcp", 80);
@@ -92,8 +94,8 @@ COROUTINE(netowrkTask)
 
     // start the server
     server.begin();
-    Serial.print("server is at ");
-    Serial.println(Ethernet.localIP());
+    //Serial.print("server is at ");
+    //Serial.println(Ethernet.localIP());
 
     while (true)
     {
@@ -148,24 +150,42 @@ COROUTINE(netowrkTask)
                             client.println();
                             serializeJson(doc, client);
                         }
-                        else if (StrContains(HTTP_req, "GET /routines.json"))
+                        else if (StrContains(HTTP_req, "GET /routines"))
                         {
-                            DynamicJsonDocument doc(NUMBER_OF_PORTS * 1040);
-                            JsonArray array = doc.to<JsonArray>();
+                            char buff[1000];
 
-                            for (Coroutine **p = ace_routine::Coroutine::getRoot(); (*p) != nullptr;
-                                 p = (*p)->getNext())
+                            // send a standard http response header
+                            client.println("HTTP/1.1 200 OK");
+                            client.println("Content-Type: application/text");
+                            client.println("Connnection: close");
+                            client.println();
+                            client.println(buff);
+                        }
+                        else if (StrContains(HTTP_req, "GET /program"))
+                        {
+                            // send a standard http response header
+                            client.println("HTTP/1.1 200 OK");
+                            client.println("Content-Type: application/json");
+                            client.println("Connnection: close");
+                            client.println();
+                            client.println((const char *)ScriptTask::program);
+                        }
+                        else if (StrContains(HTTP_req, "POST /program"))
+                        {
+                            while (client.available())
                             {
-                                JsonObject coroutineOpj = array.createNestedObject();
-                                coroutineOpj["name"] = (*p)->getName().getCString();
+                                Threads::Scope scope(ScriptTask::programLock);
+                                int bytes = client.readBytes((uint8_t *)ScriptTask::program, client.available());
+                                ScriptTask::program[bytes] = 0;
                             }
+                            ScriptTask::restart();
 
                             // send a standard http response header
                             client.println("HTTP/1.1 200 OK");
                             client.println("Content-Type: application/json");
                             client.println("Connnection: close");
                             client.println();
-                            serializeJson(doc, client);
+                            client.println((const char *)ScriptTask::program);
                         }
                         // reset buffer index and all buffer elements to 0
                         req_index = 0;
@@ -188,8 +208,6 @@ COROUTINE(netowrkTask)
             }              // end while (client.connected())
             client.stop(); // close the connection
         }                  // end if (client)
-        COROUTINE_YIELD();
+        threads.yield();
     }
-
-    COROUTINE_END();
 }

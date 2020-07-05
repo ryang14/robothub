@@ -1,4 +1,5 @@
-#include <AceRoutine.h>
+#include <TeensyThreads.h>
+#include "tasks.h"
 #include <PacketSerial.h>
 #include "ports.h"
 
@@ -60,9 +61,8 @@ void onPacketReceived(const void *sender, const uint8_t *buffer, size_t size)
     }
 }
 
-COROUTINE(packetSerialTask)
+void packetSerialTask()
 {
-    COROUTINE_BEGIN();
     Serial1.begin(SERIAL_BAUD);
     packetSerial1.setStream(&Serial1);
     packetSerial1.setPacketHandler(&onPacketReceived);
@@ -91,21 +91,13 @@ COROUTINE(packetSerialTask)
     while (true)
     {
         packetSerial1.update();
-        COROUTINE_YIELD();
         packetSerial2.update();
-        COROUTINE_YIELD();
         packetSerial3.update();
-        COROUTINE_YIELD();
         packetSerial4.update();
-        COROUTINE_YIELD();
         packetSerial5.update();
-        COROUTINE_YIELD();
         packetSerial6.update();
-        COROUTINE_YIELD();
         packetSerial7.update();
-        COROUTINE_YIELD();
         packetSerial8.update();
-        COROUTINE_YIELD();
+        threads.yield();
     }
-    COROUTINE_END();
 }

@@ -1,23 +1,19 @@
 #include <Arduino.h>
-#include <AceRoutine.h>
-using namespace ace_routine;
-
-int lastCycleTime = 0;
-int maxCycleTime = 0;
+#include <TeensyThreads.h>
+#include "tasks.h"
 
 void setup()
 {
   // Open serial communications and wait for port to open:
   Serial.begin(9600);
 
-  CoroutineScheduler::setup();
+  //Serial.println("task setup");
+  threads.setDefaultStackSize(4096);
+  threads.addThread(networkTask);
+  threads.addThread(packetSerialTask);
 }
 
 void loop()
 {
-  int cycleTime = millis();
-  CoroutineScheduler::loop();
-  lastCycleTime = millis() - cycleTime;
-  if (lastCycleTime > maxCycleTime)
-    maxCycleTime = lastCycleTime;
+  threads.yield();
 }
